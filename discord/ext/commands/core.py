@@ -252,6 +252,9 @@ class Command(_BaseCommand):
         self.parent = parent if isinstance(parent, _BaseCommand) else None
         self._before_invoke = None
         self._after_invoke = None
+        for name, data in kwargs.items():
+            if not hasattr(self, name):
+                setattr(self, name, data)
 
     @property
     def callback(self):
