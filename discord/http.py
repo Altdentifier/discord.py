@@ -158,6 +158,7 @@ class HTTPClient:
 
                 async with self.__session.request(method, url, **kwargs) as r:
                     log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
+                    print(r.headers.get('X-RateLimit-Reset'))
 
                     # even errors have text involved in them so this is safe to call
                     data = await json_or_text(r)
@@ -167,6 +168,8 @@ class HTTPClient:
                     if remaining == '0' and r.status != 429:
                         # we've depleted our current bucket
                         delta = utils._parse_ratelimit_header(r)
+                        if delta == 0:
+                            delta = 0.25
 
                         log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
                         maybe_lock.defer()
@@ -381,7 +384,7 @@ class HTTPClient:
     def add_reaction(self, channel_id, message_id, emoji):
         r = Route('PUT', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me',
                   channel_id=channel_id, message_id=message_id, emoji=emoji)
-        return self.request(r)
+        self.request(r)
 
     def remove_reaction(self, channel_id, message_id, emoji, member_id):
         r = Route('DELETE', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/{member_id}',
