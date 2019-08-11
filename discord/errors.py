@@ -115,6 +115,13 @@ class Forbidden(HTTPException):
     """
     pass
 
+class InsufficientPermissions(DiscordException):
+    """Exception that's thrown for when status code 403 is expected to occur if the request was made.
+
+    Subclass of :exc:`ClientException`
+    """
+    pass
+
 class NotFound(HTTPException):
     """Exception that's thrown for when status code 404 occurs.
 

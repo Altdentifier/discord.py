@@ -31,7 +31,7 @@ from collections import namedtuple
 
 from .iterators import HistoryIterator
 from .context_managers import Typing
-from .errors import InvalidArgument, ClientException, HTTPException
+from .errors import InvalidArgument, ClientException, HTTPException, InsufficientPermissions
 from .permissions import PermissionOverwrite, Permissions
 from .role import Role
 from .invite import Invite
@@ -221,6 +221,8 @@ class GuildChannel:
                 d.update(parent_id=parent_id, lock_permissions=lock_permissions)
             payload.append(d)
 
+        if not self.guild.me.guild_permissions.manage_channels:
+            raise InsufficientPermissions('manage_channels')
         await http.bulk_channel_update(self.guild.id, payload, reason=reason)
         self.position = position
         if parent_id is not _undefined:
@@ -258,6 +260,8 @@ class GuildChannel:
             await self._move(position, parent_id=parent_id, lock_permissions=lock_permissions, reason=reason)
 
         if options:
+            if not self.guild.me.guild_permissions.manage_channels:
+                raise InsufficientPermissions('manage_channels')
             data = await self._state.http.edit_channel(self.id, reason=reason, **options)
             self._update(self.guild, data)
 
@@ -506,6 +510,8 @@ class GuildChannel:
         ~discord.HTTPException
             Deleting the channel failed.
         """
+        if not self.guild.me.guild_permissions.manage_channels:
+            raise InsufficientPermissions('manage_channels')
         await self._state.http.delete_channel(self.id, reason=reason)
 
     async def set_permissions(self, target, *, overwrite=_undefined, reason=None, **permissions):
@@ -596,9 +602,13 @@ class GuildChannel:
         # TODO: wait for event
 
         if overwrite is None:
+            if not self.guild.me.guild_permissions.manage_channels:
+                raise InsufficientPermissions('manage_channels')
             await http.delete_channel_permissions(self.id, target.id, reason=reason)
         elif isinstance(overwrite, PermissionOverwrite):
             (allow, deny) = overwrite.pair()
+            if not self.guild.me.guild_permissions.manage_channels:
+                raise InsufficientPermissions('manage_channels')
             await http.edit_channel_permissions(self.id, target.id, allow.value, deny.value, perm_type, reason=reason)
         else:
             raise InvalidArgument('Invalid overwrite type provided.')
@@ -611,6 +621,8 @@ class GuildChannel:
         base_attrs['name'] = name or self.name
         guild_id = self.guild.id
         cls = self.__class__
+        if not self.guild.me.guild_permissions.manage_channels:
+            raise InsufficientPermissions('manage_channels')
         data = await self._state.http.create_channel(guild_id, self.type.value, reason=reason, **base_attrs)
         obj = cls(state=self._state, guild=self.guild, data=data)
 
@@ -679,7 +691,8 @@ class GuildChannel:
         :class:`~discord.Invite`
             The invite that was created.
         """
-
+        if not self.guild.me.guild_permissions.create_instant_invite:
+            raise InsufficientPermissions('create_instant_invite')
         data = await self._state.http.create_invite(self.id, reason=reason, **fields)
         return Invite.from_incomplete(data=data, state=self._state)
 
@@ -704,6 +717,8 @@ class GuildChannel:
         """
 
         state = self._state
+        if not self.guild.me.guild_permissions.manage_channels:
+            raise InsufficientPermissions('manage_channels')
         data = await state.http.invites_from_channel(self.id)
         result = []
 
@@ -734,6 +749,27 @@ class Messageable(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def _get_channel(self):
         raise NotImplementedError
+
+    @staticmethod
+    def can_send(channel, *, tts=False, embed=None, files=None):
+        permissions = channel.permissions_for(channel.guild.me)
+        if files and not permissions.attach_files:
+            raise InsufficientPermissions('attach_files')
+        if embed and not permissions.embed_links:
+            raise InsufficientPermissions('embed_links')
+        if tts and not permissions.send_tts_messages:
+            raise InsufficientPermissions('send_tts_messages')
+        if not permissions.send_messages:
+            raise InsufficientPermissions('send_messages')
+
+    @staticmethod
+    def can_fetch(channel):
+        if isinstance(channel, GuildChannel):
+            permissions = channel.permissions_for(channel.guild.me)
+            if not permissions.read_messages:
+                raise InsufficientPermissions('read_messages')
+            elif not permissions.read_message_history:
+                raise InsufficientPermissions('read_message_history')
 
     async def send(self, content=None, *, tts=False, embed=None, file=None, files=None, delete_after=None, nonce=None):
         """|coro|
@@ -802,6 +838,7 @@ class Messageable(metaclass=abc.ABCMeta):
                 raise InvalidArgument('file parameter must be File')
 
             try:
+                self.can_send(channel, files=[file], tts=tts, embed=embed)
                 data = await state.http.send_files(channel.id, files=[file],
                                                    content=content, tts=tts, embed=embed, nonce=nonce)
             finally:
@@ -814,12 +851,14 @@ class Messageable(metaclass=abc.ABCMeta):
                 raise InvalidArgument('files parameter must be a list of File')
 
             try:
+                self.can_send(channel, files=files, tts=tts, embed=embed)
                 data = await state.http.send_files(channel.id, files=files, content=content, tts=tts,
                                                    embed=embed, nonce=nonce)
             finally:
                 for f in files:
                     f.close()
         else:
+            self.can_send(channel, tts=tts, embed=embed)
             data = await state.http.send_message(channel.id, content, tts=tts, embed=embed, nonce=nonce)
 
         ret = state.create_message(channel=channel, data=data)
@@ -885,6 +924,7 @@ class Messageable(metaclass=abc.ABCMeta):
         """
 
         channel = await self._get_channel()
+        self.can_fetch(channel)
         data = await self._state.http.get_message(channel.id, id)
         return self._state.create_message(channel=channel, data=data)
 

@@ -27,6 +27,7 @@ DEALINGS IN THE SOFTWARE.
 from .asset import Asset
 from .utils import parse_time, snowflake_time
 from .mixins import Hashable
+from .errors import InsufficientPermissions
 from .enums import ChannelType, VerificationLevel, try_enum
 from collections import namedtuple
 
@@ -332,5 +333,6 @@ class Invite(Hashable):
         HTTPException
             Revoking the invite failed.
         """
-
+        if not self.me.guild_permissions.manage_channels:
+            raise InsufficientPermissions('manage_channels')
         await self._state.http.delete_invite(self.code, reason=reason)

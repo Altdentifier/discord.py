@@ -27,7 +27,7 @@ DEALINGS IN THE SOFTWARE.
 import asyncio
 import datetime
 
-from .errors import NoMoreItems
+from .errors import NoMoreItems, InsufficientPermissions
 from .utils import DISCORD_EPOCH, time_snowflake, maybe_coroutine
 from .object import Object
 from .audit_logs import AuditLogEntry
@@ -392,6 +392,8 @@ class AuditLogIterator(_AsyncIterator):
 
     async def _before_strategy(self, retrieve):
         before = self.before.id if self.before else None
+        if not self.guild.me.guild_permissions.view_audit_log:
+            raise InsufficientPermissions('view_audit_log')
         data = await self.request(self.guild.id, limit=retrieve, user_id=self.user_id,
                                   action_type=self.action_type, before=before)
 
@@ -404,6 +406,8 @@ class AuditLogIterator(_AsyncIterator):
 
     async def _after_strategy(self, retrieve):
         after = self.after.id if self.after else None
+        if not self.guild.me.guild_permissions.view_audit_log:
+            raise InsufficientPermissions('view_audit_log')
         data = await self.request(self.guild.id, limit=retrieve, user_id=self.user_id,
                                   action_type=self.action_type, after=after)
         entries = data.get('audit_log_entries', [])

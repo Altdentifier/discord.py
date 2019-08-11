@@ -36,6 +36,7 @@ from .permissions import Permissions
 from .enums import Status, try_enum
 from .colour import Colour
 from .object import Object
+from .errors import InsufficientPermissions
 
 class VoiceState:
     """Represents a Discord user's voice state.
@@ -537,10 +538,14 @@ class Member(discord.abc.Messageable, _BaseUser):
 
         deafen = fields.get('deafen')
         if deafen is not None:
+            if not self.guild.me.guild_permissions.deafen_members:
+                raise InsufficientPermissions('deafen_members')
             payload['deaf'] = deafen
 
         mute = fields.get('mute')
         if mute is not None:
+            if not self.guild.me.guild_permissions.mute_members:
+                raise InsufficientPermissions('mute_members')
             payload['mute'] = mute
 
         try:
@@ -548,6 +553,8 @@ class Member(discord.abc.Messageable, _BaseUser):
         except KeyError:
             pass
         else:
+            if not self.guild.me.guild_permissions.move_members:
+                raise InsufficientPermissions('move_members')
             payload['channel_id'] = vc and vc.id
 
         try:
@@ -555,6 +562,8 @@ class Member(discord.abc.Messageable, _BaseUser):
         except KeyError:
             pass
         else:
+            if not self.guild.me.guild_permissions.manage_roles:
+                raise InsufficientPermissions('manage_roles')
             payload['roles'] = tuple(r.id for r in roles)
 
         await http.edit_member(guild_id, self.id, reason=reason, **payload)
@@ -611,7 +620,6 @@ class Member(discord.abc.Messageable, _BaseUser):
         HTTPException
             Adding roles failed.
         """
-
         if not atomic:
             new_roles = utils._unique(Object(id=r.id) for s in (self.roles[1:], roles) for r in s)
             await self.edit(roles=new_roles, reason=reason)
@@ -620,6 +628,8 @@ class Member(discord.abc.Messageable, _BaseUser):
             guild_id = self.guild.id
             user_id = self.id
             for role in roles:
+                if role > self.guild.me.top_role and not self.guild.me.guild_permissions.manage_roles:
+                    raise InsufficientPermissions('manage_roles')
                 await req(guild_id, user_id, role.id, reason=reason)
 
     async def remove_roles(self, *roles, reason=None, atomic=True):
@@ -664,4 +674,6 @@ class Member(discord.abc.Messageable, _BaseUser):
             guild_id = self.guild.id
             user_id = self.id
             for role in roles:
+                if role > self.guild.me.top_role and not self.guild.me.guild_permissions.manage_roles:
+                    raise InsufficientPermissions('manage_roles')
                 await req(guild_id, user_id, role.id, reason=reason)

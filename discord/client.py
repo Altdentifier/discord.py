@@ -1041,7 +1041,8 @@ class Client:
             region = VoiceRegion.us_west.value
         else:
             region = region.value
-
+        if len(self.guilds) > 10:
+            raise InsufficientPermissions('More than 10 guilds!')
         data = await self.http.create_guild(name, region, icon)
         return Guild(data=data, state=self._connection)
 
@@ -1108,6 +1109,10 @@ class Client:
         """
 
         invite_id = utils.resolve_invite(invite)
+        if not isinstance(invite.guild, Guild):
+            raise InsufficientPermissions('not_in_guild')
+        if not invite.guild.me.guild_permissions.manage_guild:
+            raise InsufficientPermissions('manage_guild')
         await self.http.delete_invite(invite_id)
 
     # Miscellaneous stuff

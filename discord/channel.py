@@ -33,7 +33,7 @@ from .enums import ChannelType, try_enum
 from .mixins import Hashable
 from . import utils
 from .asset import Asset
-from .errors import ClientException, NoMoreItems
+from .errors import ClientException, NoMoreItems, InsufficientPermissions
 from .webhook import Webhook
 
 __all__ = (
@@ -277,6 +277,8 @@ class TextChannel(discord.abc.Messageable, discord.abc.GuildChannel, Hashable):
 
         if len(messages) == 1:
             message_id = messages[0].id
+            if not messages[0].author.id == self.guild.me.id and not self.guild.me.guild_permissions.manage_messages:
+                raise InsufficientPermissions('manage_messages')
             await self._state.http.delete_message(self.id, message_id)
             return
 
@@ -284,7 +286,10 @@ class TextChannel(discord.abc.Messageable, discord.abc.GuildChannel, Hashable):
             raise ClientException('Can only bulk delete messages up to 100 messages')
 
         message_ids = [m.id for m in messages]
+        if not self.guild.me.guild_permissions.manage_messages:
+            raise InsufficientPermissions('manage_messages')
         await self._state.http.delete_messages(self.id, message_ids)
+
 
     async def purge(self, *, limit=100, check=None, before=None, after=None, around=None, oldest_first=False, bulk=True):
         """|coro|
@@ -412,7 +417,8 @@ class TextChannel(discord.abc.Messageable, discord.abc.GuildChannel, Hashable):
         List[:class:`Webhook`]
             The webhooks for this channel.
         """
-
+        if not self.guild.me.guild_permissions.manage_webhooks:
+            raise InsufficientPermissions('manage_webhooks')
         data = await self._state.http.channel_webhooks(self.id)
         return [Webhook.from_state(d, state=self._state) for d in data]
 
@@ -451,7 +457,8 @@ class TextChannel(discord.abc.Messageable, discord.abc.GuildChannel, Hashable):
 
         if avatar is not None:
             avatar = utils._bytes_to_base64_data(avatar)
-
+        if not self.guild.me.guild_permissions.manage_webhooks:
+            raise InsufficientPermissions('manage_webhooks')
         data = await self._state.http.create_webhook(self.id, name=str(name), avatar=avatar, reason=reason)
         return Webhook.from_state(data, state=self._state)
 
@@ -737,6 +744,8 @@ class CategoryChannel(discord.abc.GuildChannel, Hashable):
             self.position = position
 
         if options:
+            if not self.guild.me.guild_permissions.manage_channels:
+                raise InsufficientPermissions('manage_channels')
             data = await self._state.http.edit_channel(self.id, reason=reason, **options)
             self._update(self.guild, data)
 
