@@ -354,6 +354,9 @@ class Message:
             except AttributeError:
                 pass
 
+    def _handle_edited_timestamp(self, value):
+        self._edited_timestamp = utils.parse_time(value)
+
     def _handle_pinned(self, value):
         self.pinned = value
 
@@ -400,22 +403,29 @@ class Message:
         # ourselves to a more "partial" member object.
         author = self.author
         try:
+            # Update member reference
             if author.joined_at is None:
                 author.joined_at = utils.parse_time(member.get('joined_at'))
         except AttributeError:
+            # It's a user here
+            # TODO: consider adding to cache here
             self.author = Member._from_message(message=self, data=member)
 
     def _handle_mentions(self, mentions):
-        self.mentions = []
-        if self.guild is None:
-            self.mentions = [self._state.store_user(m) for m in mentions]
+        self.mentions = r = []
+        guild = self.guild
+        state = self._state
+        if guild is None:
+            self.mentions = [state.store_user(m) for m in mentions]
             return
 
         for mention in filter(None, mentions):
             id_search = int(mention['id'])
-            member = self.guild.get_member(id_search)
+            member = guild.get_member(id_search)
             if member is not None:
-                self.mentions.append(member)
+                r.append(member)
+            else:
+                r.append(Member._try_upgrade(data=mention, guild=guild, state=state))
 
     def _handle_mention_roles(self, role_mentions):
         self.role_mentions = []
@@ -711,6 +721,11 @@ class Message:
         embed: Optional[:class:`Embed`]
             The new embed to replace the original with.
             Could be ``None`` to remove the embed.
+        suppress: :class:`bool`
+            Whether to suppress embeds for the message. This removes
+            all the embeds if set to ``True``. If set to ``False``
+            this brings the embeds back if they were suppressed.
+            Using this parameter requires :attr:`~.Permissions.manage_messages`.
         delete_after: Optional[:class:`float`]
             If provided, the number of seconds to wait in the background
             before deleting the message we just edited. If the deletion fails,
@@ -720,6 +735,9 @@ class Message:
         -------
         HTTPException
             Editing the message failed.
+        Forbidden
+            Tried to suppress a message without permissions or
+            edited a message's content or embed that isn't yours.
         """
 
         try:
@@ -738,16 +756,21 @@ class Message:
             if embed is not None:
                 fields['embed'] = embed.to_dict()
 
-        data = await self._state.http.edit_message(self.channel.id, self.id, **fields)
-        self._update(data)
-
         try:
-            delete_after = fields['delete_after']
+            suppress = fields.pop('suppress')
         except KeyError:
             pass
         else:
-            if delete_after is not None:
-                await self.delete(delay=delete_after)
+            await self._state.http.suppress_message_embeds(self.channel.id, self.id, suppress=suppress)
+
+        delete_after = fields.pop('delete_after', None)
+
+        if fields:
+            data = await self._state.http.edit_message(self.channel.id, self.id, **fields)
+            self._update(data)
+
+        if delete_after is not None:
+            await self.delete(delay=delete_after)
 
     async def pin(self):
         """|coro|

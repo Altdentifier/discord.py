@@ -112,6 +112,15 @@ class BaseUser(_BaseUser):
 
         return self
 
+    def _to_minimal_user_json(self):
+        return {
+            'name': self.name,
+            'id': self.id,
+            'avatar': self.avatar,
+            'discriminator': self.discriminator,
+            'bot': self.bot,
+        }
+
     @property
     def avatar_url(self):
         """Returns an :class:`Asset` for the avatar the user has.
@@ -166,7 +175,7 @@ class BaseUser(_BaseUser):
 
     @property
     def default_avatar(self):
-        """class:`DefaultAvatar`: Returns the default avatar for a given user. This is calculated by the user's discriminator."""
+        """:class:`DefaultAvatar`: Returns the default avatar for a given user. This is calculated by the user's discriminator."""
         return try_enum(DefaultAvatar, int(self.discriminator) % len(DefaultAvatar))
 
     @property
@@ -217,7 +226,7 @@ class BaseUser(_BaseUser):
     def created_at(self):
         """:class:`datetime.datetime`: Returns the user's creation time in UTC.
 
-        This is when the user's discord account was created."""
+        This is when the user's Discord account was created."""
         return snowflake_time(self.id)
 
     @property
@@ -294,7 +303,8 @@ class ClientUser(BaseUser):
     premium_type: :class:`PremiumType`
         Specifies the type of premium a user has (e.g. Nitro or Nitro Classic). Could be None if the user is not premium.
     """
-    __slots__ = ('email', 'locale', '_flags', 'verified', 'mfa_enabled',
+    __slots__ = BaseUser.__slots__ + \
+                ('email', 'locale', '_flags', 'verified', 'mfa_enabled',
                  'premium', 'premium_type', '_relationships', '__weakref__')
 
     def __init__(self, *, state, data):
@@ -650,7 +660,7 @@ class User(BaseUser, discord.abc.Messageable):
         Specifies if the user is a bot account.
     """
 
-    __slots__ = ('__weakref__',)
+    __slots__ = BaseUser.__slots__ + ('__weakref__',)
 
     def __repr__(self):
         return '<User id={0.id} name={0.name!r} discriminator={0.discriminator!r} bot={0.bot}>'.format(self)

@@ -41,7 +41,7 @@ from .enums import VoiceRegion, Status, ChannelType, try_enum, VerificationLevel
 from .mixins import Hashable
 from .user import User
 from .invite import Invite
-from .iterators import AuditLogIterator
+from .iterators import AuditLogIterator, MemberIterator
 from .webhook import Webhook
 from .widget import Widget
 from .asset import Asset
@@ -253,6 +253,9 @@ class Guild(Hashable):
         The number goes from 0 to 3 inclusive.
     premium_subscription_count: :class:`int`
         How many users have currently "boosted" this guild.
+    preferred_locale: Optional[:class:`str`]
+        The preferred locale for the guild. Used when filtering Server Discovery
+        results to a specific language.
     """
 
     __slots__ = ('afk_timeout', 'afk_channel', '_members', '_channels', 'icon',
@@ -262,7 +265,8 @@ class Guild(Hashable):
                  'verification_level', 'explicit_content_filter', 'splash',
                  '_voice_states', '_system_channel_id', 'default_notifications',
                  'description', 'max_presences', 'max_members', 'premium_tier',
-                 'premium_subscription_count', '_system_channel_flags')
+                 'premium_subscription_count', '_system_channel_flags',
+                 'preferred_locale',)
 
     _PREMIUM_GUILD_LIMITS = {
         None: _GuildLimit(emoji=50, bitrate=96e3, filesize=8388608),
@@ -383,6 +387,7 @@ class Guild(Hashable):
         self.premium_tier = guild.get('premium_tier', 0)
         self.premium_subscription_count = guild.get('premium_subscription_count', 0)
         self._system_channel_flags = guild.get('system_channel_flags', 0)
+        self.preferred_locale = guild.get('preferred_locale')
 
         for mdata in guild.get('members', []):
             member = Member(data=mdata, guild=self, state=state)
@@ -1090,7 +1095,7 @@ class Guild(Hashable):
                 fields['system_channel_id'] = system_channel.id
 
         if 'owner' in fields:
-            if self.owner != self.me:
+            if self.owner_id != self._state.self_id:
                 raise InvalidArgument('To transfer ownership you must be the owner of the guild.')
 
             fields['owner_id'] = fields['owner'].id
@@ -1151,6 +1156,53 @@ class Guild(Hashable):
             return channel
 
         return [convert(d) for d in data]
+
+    def fetch_members(self, *, limit=1, after=None):
+        """|coro|
+
+        Retrieves an :class:`.AsyncIterator` that enables receiving the guild's members.
+
+        .. note::
+
+            This method is an API call. For general usage, consider :attr:`members` instead.
+
+        .. versionadded:: 1.3.0
+
+        All parameters are optional.
+
+        Parameters
+        ----------
+        limit: Optional[:class:`int`]
+            The number of members to retrieve.
+            Defaults to 1.
+        after: Optional[Union[:class:`.abc.Snowflake`, :class:`datetime.datetime`]]
+            Retrieve members after this date or object.
+            If a date is provided it must be a timezone-naive datetime representing UTC time.
+
+        Raises
+        ------
+        HTTPException
+            Getting the members failed.
+
+        Yields
+        ------
+        :class:`.Member`
+            The member with the member data parsed.
+
+        Examples
+        --------
+
+        Usage ::
+
+            async for member in guild.fetch_members(limit=150):
+                print(member.name)
+
+        Flattening into a list ::
+
+            members = await guild.fetch_members(limit=150).flatten()
+            # members is now a list of Member...
+        """
+        return MemberIterator(self, limit=limit, after=after)
 
     async def fetch_member(self, member_id):
         """|coro|
@@ -1474,6 +1526,30 @@ class Guild(Hashable):
         data = await self._state.http.create_custom_emoji(self.id, name, img, roles=roles, reason=reason)
         return self._state.store_emoji(self, data)
 
+    async def fetch_roles(self):
+        """|coro|
+
+        Retrieves all :class:`Role` that the guild has.
+
+        .. note::
+
+            This method is an API call. For general usage, consider :attr:`roles` instead.
+
+        .. versionadded:: 1.3.0
+
+        Raises
+        -------
+        HTTPException
+            Retrieving the roles failed.
+
+        Returns
+        -------
+        List[:class:`Role`]
+            All roles in the guild.
+        """
+        data = await self._state.http.get_roles(self.id)
+        return [Role(guild=self, state=self._state, data=d) for d in data]
+
     async def create_role(self, *, reason=None, **fields):
         """|coro|
 
@@ -1768,3 +1844,43 @@ class Guild(Hashable):
         data = await self._state.http.get_widget(self.id)
 
         return Widget(state=self._state, data=data)
+
+    async def query_members(self, query, *, limit=5, cache=True):
+        """|coro|
+
+        Request members that belong to this guild whose username starts with
+        the query given.
+
+        This is a websocket operation and can be slow.
+
+        .. warning::
+
+            Most bots do not need to use this. It's mainly a helper
+            for bots who have disabled ``guild_subscriptions``.
+
+        .. versionadded:: 1.3
+
+        Parameters
+        -----------
+        query: :class:`str`
+            The string that the username's start with. An empty string
+            requests all members.
+        limit: :class:`int`
+            The maximum number of members to send back. This must be
+            a number between 1 and 1000.
+        cache: :class:`bool`
+            Whether to cache the members internally. This makes operations
+            such as :meth:`get_member` work for those that matched.
+
+        Raises
+        -------
+        asyncio.TimeoutError
+            The query timed out waiting for the members.
+
+        Returns
+        --------
+        List[:class:`Member`]
+            The list of members that have matched the query.
+        """
+        limit = limit or 5
+        return await self._state.query_members(self, query=query, limit=limit, cache=cache)
