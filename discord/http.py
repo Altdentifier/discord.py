@@ -158,7 +158,6 @@ class HTTPClient:
 
                 async with self.__session.request(method, url, **kwargs) as r:
                     log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
-                    print(r.headers.get('X-RateLimit-Reset'))
 
                     # even errors have text involved in them so this is safe to call
                     data = await json_or_text(r)
@@ -168,8 +167,13 @@ class HTTPClient:
                     if remaining == '0' and r.status != 429:
                         # we've depleted our current bucket
                         delta = utils._parse_ratelimit_header(r)
-                        if delta == 0:
-                            delta = 0.25
+                        try:
+                            reaction = kwargs.pop('reaction')
+                            if reaction and delta == 1.0:
+                                delta = 0.25
+                        except KeyError:
+                            pass
+
 
                         log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
                         maybe_lock.defer()
@@ -384,17 +388,17 @@ class HTTPClient:
     def add_reaction(self, channel_id, message_id, emoji):
         r = Route('PUT', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me',
                   channel_id=channel_id, message_id=message_id, emoji=emoji)
-        self.request(r)
+        self.request(r, reaction=True)
 
     def remove_reaction(self, channel_id, message_id, emoji, member_id):
         r = Route('DELETE', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/{member_id}',
                   channel_id=channel_id, message_id=message_id, member_id=member_id, emoji=emoji)
-        return self.request(r)
+        return self.request(r, reaction=True)
 
     def remove_own_reaction(self, channel_id, message_id, emoji):
         r = Route('DELETE', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me',
                   channel_id=channel_id, message_id=message_id, emoji=emoji)
-        return self.request(r)
+        return self.request(r, reaction=True)
 
     def get_reaction_users(self, channel_id, message_id, emoji, limit, after=None):
         r = Route('GET', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}',
