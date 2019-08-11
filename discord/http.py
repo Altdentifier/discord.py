@@ -174,7 +174,6 @@ class HTTPClient:
                         except KeyError:
                             pass
 
-
                         log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
                         maybe_lock.defer()
                         self.loop.call_later(delta, lock.release)
@@ -388,7 +387,7 @@ class HTTPClient:
     def add_reaction(self, channel_id, message_id, emoji):
         r = Route('PUT', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me',
                   channel_id=channel_id, message_id=message_id, emoji=emoji)
-        self.request(r, reaction=True)
+        return self.request(r, reaction=True)
 
     def remove_reaction(self, channel_id, message_id, emoji, member_id):
         r = Route('DELETE', '/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/{member_id}',
