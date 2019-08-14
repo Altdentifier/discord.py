@@ -752,15 +752,16 @@ class Messageable(metaclass=abc.ABCMeta):
 
     @staticmethod
     def can_send(channel, *, tts=False, embed=None, files=None):
-        permissions = channel.permissions_for(channel.guild.me)
-        if files and not permissions.attach_files:
-            raise InsufficientPermissions('attach_files')
-        if embed and not permissions.embed_links:
-            raise InsufficientPermissions('embed_links')
-        if tts and not permissions.send_tts_messages:
-            raise InsufficientPermissions('send_tts_messages')
-        if not permissions.send_messages:
-            raise InsufficientPermissions('send_messages')
+        if isinstance(channel, GuildChannel):
+            permissions = channel.permissions_for(channel.guild.me)
+            if files and not permissions.attach_files:
+                raise InsufficientPermissions('attach_files')
+            if embed and not permissions.embed_links:
+                raise InsufficientPermissions('embed_links')
+            if tts and not permissions.send_tts_messages:
+                raise InsufficientPermissions('send_tts_messages')
+            if not permissions.send_messages:
+                raise InsufficientPermissions('send_messages')
 
     @staticmethod
     def can_fetch(channel):

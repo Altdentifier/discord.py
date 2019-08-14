@@ -105,7 +105,7 @@ class HTTPClient:
         if self.__session.closed:
             self.__session = aiohttp.ClientSession(connector=self.connector, loop=self.loop)
 
-    async def request(self, route, *, files=None, **kwargs):
+    async def request(self, route, *, files=None, reaction=False, **kwargs):
         bucket = route.bucket
         method = route.method
         url = route.url
@@ -167,12 +167,8 @@ class HTTPClient:
                     if remaining == '0' and r.status != 429:
                         # we've depleted our current bucket
                         delta = utils._parse_ratelimit_header(r)
-                        try:
-                            reaction = kwargs.pop('reaction')
-                            if reaction and delta == 1.0:
-                                delta = 0.25
-                        except KeyError:
-                            pass
+                        if reaction and delta == 1.0:
+                            delta = 0.25
 
                         log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
                         maybe_lock.defer()
