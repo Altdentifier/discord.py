@@ -1640,7 +1640,7 @@ class Guild(Hashable):
     def can_kick(self, user):
         if not self.me.guild_permissions.kick_members:
             raise InsufficientPermissions('kick_members')
-        if self.me.top_role < self.get_member(user.id):
+        if self.me.top_role < self.get_member(user.id).top_role:
             raise InsufficientPermissions('kick_members_hierarchy')
 
     async def kick(self, user, *, reason=None):
@@ -1673,7 +1673,7 @@ class Guild(Hashable):
     def can_ban(self, user):
         if not self.me.guild_permissions.ban_members:
             raise InsufficientPermissions('ban_members')
-        if self.me.top_role < self.get_member(user.id):
+        if self.me.top_role < self.get_member(user.id).top_role:
             raise InsufficientPermissions('ban_members_hierarchy')
 
     async def ban(self, user, *, reason=None, delete_message_days=1):
