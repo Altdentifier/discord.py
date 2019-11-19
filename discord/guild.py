@@ -803,8 +803,6 @@ class Guild(Hashable):
             pass
 
         parent_id = category.id if category else None
-        if not self.me.guild_permissions.manage_channels:
-            raise InsufficientPermissions('manage_channels')
         return self._state.http.create_channel(self.id, channel_type.value, name=name, parent_id=parent_id,
                                                permission_overwrites=perms, **options)
 
@@ -947,8 +945,6 @@ class Guild(Hashable):
         HTTPException
             Leaving the guild failed.
         """
-        if self.owner.id == self.me.id:
-            raise InsufficientPermissions('you_are_owner')
         await self._state.http.leave_guild(self.id)
 
     async def delete(self):
@@ -1056,8 +1052,6 @@ class Guild(Hashable):
         except KeyError:
             pass
         else:
-            if not self.me.guild_permissions.manage_guild:
-                raise InsufficientPermissions('manage_guild')
             await http.change_vanity_code(self.id, vanity_code, reason=reason)
 
         try:
@@ -1127,8 +1121,6 @@ class Guild(Hashable):
             raise InvalidArgument('system_channel_flags field must be of type SystemChannelFlags')
 
         fields['system_channel_flags'] = system_channel_flags.value
-        if not self.me.guild_permissions.manage_guild:
-            raise InsufficientPermissions('manage_guild')
         await http.edit_guild(self.id, reason=reason, **fields)
 
     async def fetch_channels(self):
@@ -1271,8 +1263,6 @@ class Guild(Hashable):
         BanEntry
             The BanEntry object for the specified user.
         """
-        if not self.me.guild_permissions.ban_members:
-            raise InsufficientPermissions('ban_members')
         data = await self._state.http.get_ban(user.id, self.id)
         return BanEntry(
             user=User(state=self._state, data=data['user']),
@@ -1304,8 +1294,6 @@ class Guild(Hashable):
         List[BanEntry]
             A list of BanEntry objects.
         """
-        if not self.me.guild_permissions.ban_members:
-            raise InsufficientPermissions('ban_members')
         data = await self._state.http.get_bans(self.id)
         return [BanEntry(user=User(state=self._state, data=e['user']),
                          reason=e['reason'])
@@ -1355,8 +1343,6 @@ class Guild(Hashable):
 
         if not isinstance(days, int):
             raise InvalidArgument('Expected int for ``days``, received {0.__class__.__name__} instead.'.format(days))
-        if not self.me.guild_permissions.kick_members:
-            raise InsufficientPermissions('kick_members')
         data = await self._state.http.prune_members(self.id, days, compute_prune_count=compute_prune_count, reason=reason)
         return data['pruned']
 
@@ -1377,8 +1363,6 @@ class Guild(Hashable):
         List[:class:`Webhook`]
             The webhooks for this guild.
         """
-        if not self.me.guild_permissions.manage_webhooks:
-            raise InsufficientPermissions('manage_webhooks')
         data = await self._state.http.guild_webhooks(self.id)
         return [Webhook.from_state(d, state=self._state) for d in data]
 
@@ -1411,8 +1395,6 @@ class Guild(Hashable):
 
         if not isinstance(days, int):
             raise InvalidArgument('Expected int for ``days``, received {0.__class__.__name__} instead.'.format(days))
-        if not self.me.guild_permissions.kick_members:
-            raise InsufficientPermissions('kick_members')
         data = await self._state.http.estimate_pruned_members(self.id, days)
         return data['pruned']
 
@@ -1436,8 +1418,6 @@ class Guild(Hashable):
         List[:class:`Invite`]
             The list of invites that are currently active.
         """
-        if not self.me.guild_permissions.manage_guild:
-            raise InsufficientPermissions('manage_guild')
         data = await self._state.http.invites_from(self.id)
         result = []
         for invite in data:
@@ -1539,8 +1519,6 @@ class Guild(Hashable):
         img = utils._bytes_to_base64_data(image)
         if roles:
             roles = [role.id for role in roles]
-        if not self.me.guild_permissions.manage_emojis:
-            raise InsufficientPermissions('manage_emojis')
         data = await self._state.http.create_custom_emoji(self.id, name, img, roles=roles, reason=reason)
         return self._state.store_emoji(self, data)
 
