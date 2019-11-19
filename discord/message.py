@@ -698,7 +698,7 @@ class Message:
             async def delete():
                 await asyncio.sleep(delay, loop=self._state.loop)
                 try:
-                    if self.author.id != self._state.self_id and not self.guild.me.manage_messages:
+                    if self.author.id != self._state.self_id and not self.guild.me.guild_permissions.manage_messages:
                         raise InsufficientPermissions('manage_messages')
                     await self._state.http.delete_message(self.channel.id, self.id)
                 except HTTPException:
@@ -706,7 +706,7 @@ class Message:
 
             asyncio.ensure_future(delete(), loop=self._state.loop)
         else:
-            if self.author.id != self._state.self_id and not self.guild.me.manage_messages:
+            if self.author.id != self._state.self_id and not self.guild.me.guild_permissions.manage_messages:
                 raise InsufficientPermissions('manage_messages')
             await self._state.http.delete_message(self.channel.id, self.id)
 
@@ -798,7 +798,7 @@ class Message:
             Pinning the message failed, probably due to the channel
             having more than 50 pinned messages.
         """
-        if not self.guild.me.manage_messages:
+        if not self.guild.me.guild_permissions.manage_messages:
             raise InsufficientPermissions('manage_messages')
         await self._state.http.pin_message(self.channel.id, self.id)
         self.pinned = True
@@ -820,7 +820,7 @@ class Message:
         HTTPException
             Unpinning the message failed.
         """
-        if not self.guild.me.manage_messages:
+        if not self.guild.me.guild_permissions.manage_messages:
             raise InsufficientPermissions('manage_messages')
         await self._state.http.unpin_message(self.channel.id, self.id)
         self.pinned = False
@@ -893,7 +893,7 @@ class Message:
         if member.id == self._state.self_id:
             await self._state.http.remove_own_reaction(self.channel.id, self.id, emoji)
         else:
-            if not self.guild.me.manage_messages:
+            if not self.guild.me.guild_permissions.manage_messages:
                 raise InsufficientPermissions('manage_messages')
             await self._state.http.remove_reaction(self.channel.id, self.id, emoji, member.id)
 
@@ -927,7 +927,7 @@ class Message:
         Forbidden
             You do not have the proper permissions to remove all the reactions.
         """
-        if not self.guild.me.manage_messages:
+        if not self.guild.me.guild_permissions.manage_messages:
             raise InsufficientPermissions('manage_messages')
         await self._state.http.clear_reactions(self.channel.id, self.id)
 
