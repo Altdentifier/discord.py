@@ -839,7 +839,7 @@ class Messageable(metaclass=abc.ABCMeta):
                 raise InvalidArgument('file parameter must be File')
 
             try:
-                self.can_send(channel, files=[file], tts=tts, embed=embed)
+                # self.can_send(channel, files=[file], tts=tts, embed=embed)
                 data = await state.http.send_files(channel.id, files=[file],
                                                    content=content, tts=tts, embed=embed, nonce=nonce)
             finally:
@@ -852,14 +852,14 @@ class Messageable(metaclass=abc.ABCMeta):
                 raise InvalidArgument('files parameter must be a list of File')
 
             try:
-                self.can_send(channel, files=files, tts=tts, embed=embed)
+                # self.can_send(channel, files=files, tts=tts, embed=embed)
                 data = await state.http.send_files(channel.id, files=files, content=content, tts=tts,
                                                    embed=embed, nonce=nonce)
             finally:
                 for f in files:
                     f.close()
         else:
-            self.can_send(channel, tts=tts, embed=embed)
+            # self.can_send(channel, tts=tts, embed=embed)
             data = await state.http.send_message(channel.id, content, tts=tts, embed=embed, nonce=nonce)
 
         ret = state.create_message(channel=channel, data=data)
